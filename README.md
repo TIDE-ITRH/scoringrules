@@ -7,17 +7,17 @@
 
 <!-- badges: end -->
 
-This is the GitHub repo for the translational paper ‘’Evaluating
+This is the GitHub repository for the translational paper ‘’Evaluating
 Probabilistic Forecasts for Maritime Engineering Operations’’ submitted
 to *Data-centric Engineering*. The main purpose of the paper is to make
 existing statistical methodology available to an engineering audience
 with the hope that it may be more widely adopted. The methodology is
 then supported by a case study of forecasting surface winds at a
-location in Australia’s North–West Shelf. This repository is broken into
-two sections: the first, and main section, shows code and methods for
-calculating three chosen scoring rules given a probabilistic forecast;
-the second section documents the code for the case study in the paper.
-Some data is provided alongside. Note, we heavily use
+location in Australia’s North–West Shelf (NWS). This repository is
+broken into two sections: the first, and main section, shows code and
+methods for calculating three chosen scoring rules given a probabilistic
+forecast; the second section documents the code for the case study in
+the paper. Some data is provided alongside. Note, we heavily use
 [tidyverse](https://www.tidyverse.org) packages and syntax; in
 particular, [pipes](https://style.tidyverse.org/pipes.html).
 
@@ -239,4 +239,93 @@ lapply(horizons, function(i){
 
 ## Case Study of Surface Wind Prediction
 
-We
+To exemplify the theory of proper scoring rules, in the paper we
+demonstrate the methodology on a case study of forecasting surface winds
+at a location on the Australian NWS. We build two probabilistic
+forecasting models: a MOS model, and a vector-autoregressive model; the
+mathematics for both of these are in the paper’s appendix. Code for both
+of these models is included in the
+[models](https://github.com/TIDE-ITRH/scoringrules/tree/main/models)
+folder of this repository. Each of these scripts has three main
+functions: the first (<tt>sample\_mcmc\_XXX</tt>) uses MCMC sampling to
+estimate the unknown model parameters, the second
+(<tt>predict\_mcmc\_XXX</tt>) makes probabilistic forecasts for surface
+wind, and the third (<tt>calc\_diagnostics\_XXX</tt>) takes the
+probabilistic forecasts and calculates the scores as documented above.
+An example on how to run these models is provided below. Note the MCMC
+sampling requires the packages <tt>LaplacesDemon</tt> and
+<tt>mvtnorm</tt>. Data files <tt>wind\_meas\_train.RDS</tt>,
+<tt>wind\_meas\_val.RDS</tt>, <tt>wind\_fore\_train.RDS</tt>, and
+<tt>wind\_fore\_val.RDS</tt> are supplied in the
+[data](https://github.com/TIDE-ITRH/scoringrules/tree/main/data) folder;
+note, they have been anonymised and are not the data that have produced
+the results in the paper.
+
+``` r
+library(LaplacesDemon)
+library(mvtnorm)
+
+mcmc_list <- sample_mcmc_mos(
+  wind_meas_train, 
+  c("ew_meas", "nw_meas"), 
+  wind_fore_train, 
+  c("ew_fore", "nw_fore"),
+  1000
+)
+
+mos_predict <- predict_mcmc_mos(
+  mcmc_list, 
+  wind_meas_val, 
+  c("ew_meas", "nw_meas"), 
+  wind_fore_val, 
+  c("ew_fore", "nw_fore")
+)
+
+mos_diagnostics <- calc_diagnostics_mos(
+  mos_predict, 
+  wind_meas_val, 
+  c("ew_meas", "nw_meas"), 
+  wind_fore_val, 
+  c("ew_fore", "nw_fore"),
+  100
+)
+```
+
+The resulting calculation of the skills (what the results in Figure 8
+show) for both the MOS and VAR models is shown below.
+
+``` r
+mos_diagnostics <- readRDS("data/mos_diagnostics.RDS")
+var_diagnostics <- readRDS("data/var_diagnostics.RDS")
+
+mos_diagnostics
+#> # A tibble: 216 × 4
+#>    horizon score metric model
+#>      <dbl> <dbl> <chr>  <chr>
+#>  1       0  1.84 RMSE   MOS  
+#>  2       1  1.87 RMSE   MOS  
+#>  3       2  1.87 RMSE   MOS  
+#>  4       3  1.90 RMSE   MOS  
+#>  5       4  1.88 RMSE   MOS  
+#>  6       5  1.84 RMSE   MOS  
+#>  7       6  1.81 RMSE   MOS  
+#>  8       7  1.87 RMSE   MOS  
+#>  9       8  1.92 RMSE   MOS  
+#> 10       9  1.94 RMSE   MOS  
+#> # … with 206 more rows
+var_diagnostics
+#> # A tibble: 144 × 4
+#>    horizon score metric model
+#>      <int> <dbl> <chr>  <chr>
+#>  1       1  1.34 RMSE   VAR  
+#>  2       2  1.74 RMSE   VAR  
+#>  3       3  1.98 RMSE   VAR  
+#>  4       4  2.13 RMSE   VAR  
+#>  5       5  2.26 RMSE   VAR  
+#>  6       6  2.33 RMSE   VAR  
+#>  7       7  2.42 RMSE   VAR  
+#>  8       8  2.46 RMSE   VAR  
+#>  9       9  2.52 RMSE   VAR  
+#> 10      10  2.55 RMSE   VAR  
+#> # … with 134 more rows
+```

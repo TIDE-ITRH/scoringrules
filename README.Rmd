@@ -18,7 +18,7 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 <!-- badges: end -->
 
-This is the GitHub repo for the translational paper ''Evaluating Probabilistic Forecasts for Maritime Engineering Operations'' submitted to *Data-centric Engineering*. The main purpose of the paper is to make existing statistical methodology available to an engineering audience with the hope that it may be more widely adopted. The methodology is then supported by a case study of forecasting surface winds at a location in Australia's North--West Shelf. This repository is broken into two sections: the first, and main section, shows code and methods for calculating three chosen scoring rules given a probabilistic forecast; the second section documents the code for the case study in the paper. Some data is provided alongside. Note, we heavily use [tidyverse](https://www.tidyverse.org) packages and syntax; in particular, [pipes](https://style.tidyverse.org/pipes.html).
+This is the GitHub repository for the translational paper ''Evaluating Probabilistic Forecasts for Maritime Engineering Operations'' submitted to *Data-centric Engineering*. The main purpose of the paper is to make existing statistical methodology available to an engineering audience with the hope that it may be more widely adopted. The methodology is then supported by a case study of forecasting surface winds at a location in Australia's North--West Shelf (NWS). This repository is broken into two sections: the first, and main section, shows code and methods for calculating three chosen scoring rules given a probabilistic forecast; the second section documents the code for the case study in the paper. Some data is provided alongside. Note, we heavily use [tidyverse](https://www.tidyverse.org) packages and syntax; in particular, [pipes](https://style.tidyverse.org/pipes.html).
 
 ## Scoring Rules
 
@@ -138,8 +138,46 @@ lapply(horizons, function(i){
 
 ## Case Study of Surface Wind Prediction
 
-We 
+To exemplify the theory of proper scoring rules, in the paper we demonstrate the methodology on a case study of forecasting surface winds at a location on the Australian NWS. We build two probabilistic forecasting models: a MOS model, and a vector-autoregressive model; the mathematics for both of these are in the paper's appendix. Code for both of these models is included in the [models](https://github.com/TIDE-ITRH/scoringrules/tree/main/models) folder of this repository. Each of these scripts has three main functions: the first (<tt>sample_mcmc_XXX</tt>) uses MCMC sampling to estimate the unknown model parameters, the second (<tt>predict_mcmc_XXX</tt>) makes probabilistic forecasts for surface wind, and the third (<tt>calc_diagnostics_XXX</tt>) takes the probabilistic forecasts and calculates the scores as documented above. An example on how to run these models is provided below. Note the MCMC sampling requires the packages <tt>LaplacesDemon</tt> and <tt>mvtnorm</tt>. Data files <tt>wind_meas_train.RDS</tt>, <tt>wind_meas_val.RDS</tt>, <tt>wind_fore_train.RDS</tt>, and <tt>wind_fore_val.RDS</tt> are supplied in the [data](https://github.com/TIDE-ITRH/scoringrules/tree/main/data) folder; note, they have been anonymised and are not the data that have produced the results in the paper.
 
+```{r, eval = FALSE}
+library(LaplacesDemon)
+library(mvtnorm)
+
+mcmc_list <- sample_mcmc_mos(
+  wind_meas_train, 
+  c("ew_meas", "nw_meas"), 
+  wind_fore_train, 
+  c("ew_fore", "nw_fore"),
+  1000
+)
+
+mos_predict <- predict_mcmc_mos(
+  mcmc_list, 
+  wind_meas_val, 
+  c("ew_meas", "nw_meas"), 
+  wind_fore_val, 
+  c("ew_fore", "nw_fore")
+)
+
+mos_diagnostics <- calc_diagnostics_mos(
+  mos_predict, 
+  wind_meas_val, 
+  c("ew_meas", "nw_meas"), 
+  wind_fore_val, 
+  c("ew_fore", "nw_fore"),
+  100
+)
+```
+The resulting calculation of the skills (what the results in Figure 8 show) for both the MOS and VAR models is shown below.
+
+```{r}
+mos_diagnostics <- readRDS("data/mos_diagnostics.RDS")
+var_diagnostics <- readRDS("data/var_diagnostics.RDS")
+
+mos_diagnostics
+var_diagnostics
+```
 
 
 
