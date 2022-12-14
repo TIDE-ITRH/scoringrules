@@ -62,14 +62,61 @@ mos_mcmc_predict <- left_join(east_tmp, north_tmp) %>%
 
 saveRDS(mos_mcmc_predict, "data/mos_predictions.RDS")
 
+# SQUARED ERROR
 
-mos_mcmc_predict %>%
+mos_mean <- mos_mcmc_predict %>%
 	group_by(time_issued, time_forecast, meas_east, meas_north) %>%
 	summarise(
 		mu_east = mean(fore_east),
 		mu_north = mean(fore_north)
+	) %>%
+	ungroup()
+
+mos_mean %>%
+	mutate(
+		SE = (meas_east - mu_east)^2 + (meas_north - mu_north)^2
 	)
 
+# DSS
+
+horizons <- mos_mcmc_predict$horizon %>% unique()
+
+lapply(horizons, function(i){
+	tmp <- mos_mcmc_predict %>%
+	filter(horizon == i)
+
+	forecasts_tmp <- matrix(c(tmp$fore_east, tmp$fore_north), ncol = 2)
+
+	fmean <- colMeans(forecasts_tmp) %>% matrix()
+	fvar <- var(forecasts_tmp)
+
+	obs_tmp <- as.matrix(c(tmp$meas_east[1], tmp$meas_north[1]))
+
+	DSS_calc <- as.numeric(log(det(fvar)) + t(fmean - obs_tmp) %*% solve(fvar) %*% (fmean - obs_tmp))
+
+	tmp[1,] %>%
+		dplyr::select(time_issued, time_forecast, horizon) %>%
+		mutate(DSS = DSS_calc)
+}) %>%
+	bind_rows()
+
+# ?es_sample
+
+# lapply(horizons, function(i){
+	tmp <- mos_mcmc_predict %>%
+	filter(horizon == 1)
+
+	forecasts_tmp <- matrix(c(tmp$fore_east, tmp$fore_north), ncol = 2)
+
+	obs_tmp <- c(tmp$meas_east[1], tmp$meas_north[1])
+
+	es_sample(obs_tmp, t(forecasts_tmp))
+
+	tmp[1,] %>%
+		dplyr::select(time_issued, time_forecast, horizon) %>%
+		mutate(DSS = DSS_calc)
+# }) %>%
+# 	bind_rows()
 
 
 
